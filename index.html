@@ -2,14 +2,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Billing System - EVS</title>
+  <title>EVS Smart Billing</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f1f7f5;
+      background: #f0fdf4;
       margin: 0;
+      padding: 0;
     }
     header {
       background: #10b981;
@@ -20,35 +21,40 @@
       font-weight: bold;
     }
     nav {
-      background: #065f46;
-      text-align: right;
-      padding: 10px 20px;
+      background: #059669;
+      color: white;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     nav a {
       color: white;
-      margin-left: 20px;
       text-decoration: none;
       font-weight: bold;
     }
+    .container {
+      padding: 20px;
+      text-align: center;
+    }
     #reader {
-      width: 300px;
+      width: 320px;
       margin: 20px auto;
+      padding: 10px;
       border: 3px dashed #333;
       background-color: #e2e8f0;
-      padding: 10px;
     }
     table {
       margin: auto;
       border-collapse: collapse;
-      width: 90%;
+      width: 95%;
       background: white;
     }
     th, td {
       border: 1px solid #ccc;
       padding: 10px;
-      text-align: center;
     }
-    button, select {
+    button, select, input {
       margin: 10px;
       padding: 10px 20px;
       background: #10b981;
@@ -57,34 +63,46 @@
       border-radius: 6px;
       font-size: 16px;
     }
-    .center {
-      text-align: center;
-      margin-top: 20px;
+    input[type="text"] {
+      background: #e0f2f1;
+      color: #111;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <header>EVS - Smart Billing System</header>
+  <header>EVS Smart Billing System</header>
   <nav>
-    <a href="#" onclick="alert('Login/Register Coming Soon')">Click here to open your account</a>
-  </nav>  <div class="center">
-    <label for="cameraSelect">Select Camera:</label>
-    <select id="cameraSelect"></select>
-    <button onclick="toggleTorch()">Torch On/Off</button>
-  </div>  <div id="reader"></div>  <table id="billTable">
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>Qty</th>
-        <th>Rate</th>
-        <th>Tax</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>  <h3 class="center">Total: ₹<span id="grandTotal">0</span></h3>
-  <div class="center">
-    <button onclick="downloadPDF()">Download PDF Bill</button>
+    <span>Welcome, <span id="customerName">Guest</span></span>
+    <a href="#" onclick="openAccountPage()">Click here to open your account</a>
+  </nav>
+  <div class="container">
+    <div id="accountForm" style="display: none">
+      <input type="text" id="nameInput" placeholder="Enter Your Name" />
+      <input type="text" id="phoneInput" placeholder="Enter Phone Number" />
+      <button onclick="createAccount()">Create Account</button>
+    </div><label for="cameraSelect">Select Camera:</label>
+<select id="cameraSelect"></select>
+<button onclick="toggleTorch()">Torch On/Off</button>
+
+<div id="reader"></div>
+
+<table id="billTable">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Qty</th>
+      <th>Rate</th>
+      <th>Tax</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+
+<h3>Total: ₹<span id="grandTotal">0</span></h3>
+<button onclick="downloadPDF()">Download PDF Bill</button>
+
   </div>  <script>
     let html5QrCode;
     let currentCameraId = null;
@@ -93,47 +111,36 @@
     const tableBody = document.getElementById("tableBody");
     const grandTotalEl = document.getElementById("grandTotal");
     const cameraSelect = document.getElementById("cameraSelect");
+    const customerName = document.getElementById("customerName");
 
-    // Sample offline product data
     const localProductDB = {
-      "901030865169": {
-        name: "Surf Excel Detergent",
-        rate: 72,
-        tax: 3.6
-      },
-      "8901030700553": {
-        name: "Dove Shampoo",
-        rate: 120,
-        tax: 6
-      },
-      "8901393025371": {
-        name: "Lifebuoy Soap",
-        rate: 35,
-        tax: 1.75
-      }
+      "901030865169": { name: "Surf Excel", rate: 120 },
+      "8901030865161": { name: "Lifebuoy Soap", rate: 35 },
+      "8901030851234": { name: "Dove Shampoo", rate: 99 }
     };
 
-    function addToBill(name, rate, tax) {
-      const total = rate + tax;
+    function addToBill(name, rate) {
+      const tax = +(rate * 0.05).toFixed(2);
+      const total = +(rate + tax).toFixed(2);
       totalAmount += total;
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${name}</td>
         <td>1</td>
-        <td>₹${rate.toFixed(2)}</td>
-        <td>₹${tax.toFixed(2)}</td>
-        <td>₹${total.toFixed(2)}</td>
+        <td>₹${rate}</td>
+        <td>₹${tax}</td>
+        <td>₹${total}</td>
       `;
       tableBody.appendChild(row);
       grandTotalEl.innerText = totalAmount.toFixed(2);
     }
 
-    function fetchProductDetails(barcode) {
-      const product = localProductDB[barcode];
+    function fetchProductDetails(code) {
+      const product = localProductDB[code];
       if (product) {
-        addToBill(product.name, product.rate, product.tax);
+        addToBill(product.name, product.rate);
       } else {
-        alert("Unknown product: " + barcode);
+        alert("Unknown Product: " + code);
       }
     }
 
@@ -152,36 +159,21 @@
       html5QrCode = new Html5Qrcode("reader", true);
       html5QrCode.start(
         { deviceId: { exact: cameraId } },
-        {
-          fps: 10,
-          qrbox: 250,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
-        },
-        decodedText => {
-          fetchProductDetails(decodedText);
-        },
-        errorMessage => {
-          console.warn("Scan error:", errorMessage);
-        }
-      ).catch(err => {
-        console.error("Camera start failed:", err);
-      });
+        { fps: 10, qrbox: 250, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
+        decodedText => fetchProductDetails(decodedText),
+        errorMessage => console.warn("Scan error:", errorMessage)
+      ).catch(err => console.error("Camera start failed:", err));
     }
 
     function toggleTorch() {
-      html5QrCode.applyVideoConstraints({
-        advanced: [{ torch: torchOn = !torchOn }]
-      }).catch(() => {
-        alert("Torch not supported on this device/browser.");
-      });
+      html5QrCode.applyVideoConstraints({ advanced: [{ torch: torchOn = !torchOn }] })
+        .catch(() => alert("Torch not supported."));
     }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.text("EVS - Smart Billing System", 10, 10);
+      doc.text("EVS Smart Billing", 10, 10);
       let y = 20;
       Array.from(tableBody.children).forEach(row => {
         const cols = row.querySelectorAll("td");
@@ -190,6 +182,22 @@
       });
       doc.text(`Total: ₹${totalAmount.toFixed(2)}`, 10, y + 10);
       doc.save("bill.pdf");
+    }
+
+    function openAccountPage() {
+      document.getElementById("accountForm").style.display = "block";
+    }
+
+    function createAccount() {
+      const name = document.getElementById("nameInput").value;
+      const phone = document.getElementById("phoneInput").value;
+      if (name && phone) {
+        customerName.innerText = name;
+        document.getElementById("accountForm").style.display = "none";
+        alert("Account Created Successfully!");
+      } else {
+        alert("Please enter name and phone number.");
+      }
     }
 
     Html5Qrcode.getCameras().then(devices => {
