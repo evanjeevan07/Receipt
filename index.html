@@ -1,15 +1,43 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Billing System</title>
+  <title>EVS Smart Billing System</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f1f7f5;
+      margin: 0;
+    }
+    header, nav {
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+    }
+    header {
+      background-color: #e0f2f1;
+    }
+    header img {
+      height: 50px;
+      margin-right: 10px;
+    }
+    nav {
+      background-color: #10b981;
+      justify-content: space-between;
+    }
+    nav button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    main {
+      padding: 20px;
       text-align: center;
     }
     table {
@@ -37,38 +65,98 @@
       border: 3px dashed #333;
       background-color: #e2e8f0;
     }
+    #accountModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    #accountModal div {
+      background: white;
+      margin: 10% auto;
+      padding: 20px;
+      width: 300px;
+      border-radius: 10px;
+    }
+    #accountModal input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
-  <h2>Smart Billing System</h2>
-  <div>
-    <label for="cameraSelect">Select Camera:</label>
-    <select id="cameraSelect"></select>
-    <button onclick="toggleTorch()">Torch On/Off</button>
-  </div>
-  <div id="reader"></div>
+  <header>
+    <img src="logo.png" alt="Logo">
+    <h1>EVS Smart Billing</h1>
+  </header>
+  <nav>
+    <button onclick="openAccountModal()">Click here to open your account</button>
+  </nav>  <div id="accountModal">
+    <div>
+      <h2>Login / Register</h2>
+      <input type="text" id="phoneNumber" placeholder="Enter phone number">
+      <button onclick="sendOTP()">Send OTP</button>
+      <input type="text" id="otpInput" placeholder="Enter OTP">
+      <button onclick="verifyOTP()">Verify OTP</button>
+      <button onclick="closeAccountModal()" style="background-color: #ef4444;">Close</button>
+    </div>
+  </div>  <main>
+    <div>
+      <label for="cameraSelect">Select Camera:</label>
+      <select id="cameraSelect"></select>
+      <button onclick="toggleTorch()">Torch On/Off</button>
+    </div>
+    <div id="reader"></div><table id="billTable">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Qty</th>
+      <th>Rate</th>
+      <th>Tax</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody"></tbody>
+</table>
+<h3>Total: ₹<span id="grandTotal">0</span></h3>
+<button onclick="downloadPDF()">Download PDF Bill</button>
 
-  <table id="billTable">
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>Qty</th>
-        <th>Rate</th>
-        <th>Tax</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>
+  </main>  <script>
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-  <h3>Total: ₹<span id="grandTotal">0</span></h3>
-  <button onclick="downloadPDF()">Download PDF Bill</button>
+    function openAccountModal() {
+      document.getElementById("accountModal").style.display = "block";
+    }
+    function closeAccountModal() {
+      document.getElementById("accountModal").style.display = "none";
+    }
+    function sendOTP() {
+      const phoneNumber = "+91" + document.getElementById("phoneNumber").value;
+      const appVerifier = new firebase.auth.RecaptchaVerifier('sendOTP', {
+        size: 'invisible'
+      });
+      auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+        .then(confirmationResult => window.confirmationResult = confirmationResult)
+        .catch(error => alert(error.message));
+    }
+    function verifyOTP() {
+      const otp = document.getElementById("otpInput").value;
+      window.confirmationResult.confirm(otp)
+        .then(result => {
+          alert("Phone verified!");
+          closeAccountModal();
+        })
+        .catch(error => alert("Invalid OTP"));
+    }
 
-  <script>
-    let html5QrCode;
-    let currentCameraId = null;
-    let torchOn = false;
-    let totalAmount = 0;
+    let html5QrCode, currentCameraId = null, torchOn = false, totalAmount = 0;
     const tableBody = document.getElementById("tableBody");
     const grandTotalEl = document.getElementById("grandTotal");
     const cameraSelect = document.getElementById("cameraSelect");
@@ -77,95 +165,26 @@
       const total = rate + tax;
       totalAmount += total;
       const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${name}</td>
-        <td>1</td>
-        <td>₹${rate.toFixed(2)}</td>
-        <td>₹${tax.toFixed(2)}</td>
-        <td>₹${total.toFixed(2)}</td>
-      `;
+      row.innerHTML = `<td>${name}</td><td>1</td><td>₹${rate}</td><td>₹${tax}</td><td>₹${total}</td>`;
       tableBody.appendChild(row);
-      grandTotalEl.innerText = totalAmount.toFixed(2);
-    }
-
-    async function fetchProductDetails(barcode) {
-      try {
-        const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`);
-        const data = await res.json();
-        if (data?.items?.length > 0) {
-          const item = data.items[0];
-          const name = item.title?.substring(0, 50) || "Unknown Item";
-          const rate = item.offers?.[0]?.price || 50;
-          const tax = rate * 0.05;
-          addToBill(name, rate, tax);
-        } else {
-          addToBill(`Unknown Item (${barcode})`, 50, 2.5); // fallback
-        }
-      } catch (err) {
-        console.warn("API Error, fallback item added:", err);
-        addToBill(`Error Item (${barcode})`, 50, 2.5);
-      }
-    }
-
-    function startScanner(cameraId) {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          html5QrCode.clear();
-          initScanner(cameraId);
-        }).catch(err => {
-          console.warn("Stop failed, restarting directly");
-          initScanner(cameraId);
-        });
-      } else {
-        initScanner(cameraId);
-      }
-    }
-
-    function initScanner(cameraId) {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { deviceId: { exact: cameraId } },
-        {
-          fps: 10,
-          qrbox: 250,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
-        },
-        decodedText => {
-          fetchProductDetails(decodedText);
-        },
-        errorMessage => {
-          console.log("QR Error:", errorMessage);
-        }
-      ).catch(err => {
-        console.error("Camera start failed:", err);
-        alert("Unable to start camera.");
-      });
+      grandTotalEl.innerText = totalAmount;
     }
 
     function toggleTorch() {
-      html5QrCode.applyVideoConstraints({
-        advanced: [{ torch: torchOn = !torchOn }]
-      }).catch(() => {
-        alert("Torch not supported on this device/browser.");
-      });
+      html5QrCode.applyVideoConstraints({ advanced: [{ torch: torchOn = !torchOn }] });
     }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.setFontSize(14);
-      doc.text("Smart Billing System", 10, 10);
+      doc.text("EVS Smart Billing", 10, 10);
       let y = 20;
-      doc.setFontSize(12);
       Array.from(tableBody.children).forEach(row => {
         const cols = row.querySelectorAll("td");
-        const line = `${cols[0].innerText} | Qty: ${cols[1].innerText} | Rate: ${cols[2].innerText} | Tax: ${cols[3].innerText} | Total: ${cols[4].innerText}`;
-        doc.text(line, 10, y);
+        doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText} | ${cols[3].innerText} | ${cols[4].innerText}`, 10, y);
         y += 10;
       });
-      doc.text(`Grand Total: ₹${totalAmount.toFixed(2)}`, 10, y + 10);
+      doc.text(`Total: ₹${totalAmount}`, 10, y + 10);
       doc.save("bill.pdf");
     }
 
@@ -177,20 +196,35 @@
         cameraSelect.appendChild(option);
       });
       if (devices.length > 0) {
-        const preferred = devices.find(c => /back|rear/i.test(c.label)) || devices[0];
-        currentCameraId = preferred.id;
-        cameraSelect.value = currentCameraId;
+        currentCameraId = devices[0].id;
         startScanner(currentCameraId);
       }
-    }).catch(err => {
-      alert("No cameras found.");
-      console.error(err);
     });
 
     cameraSelect.addEventListener("change", e => {
       currentCameraId = e.target.value;
       startScanner(currentCameraId);
     });
-  </script>
-</body>
+
+    function startScanner(cameraId) {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          initScanner(cameraId);
+        });
+      } else {
+        initScanner(cameraId);
+      }
+    }
+
+    function initScanner(cameraId) {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { deviceId: { exact: cameraId } },
+        { fps: 10, qrbox: 250, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
+        decodedText => addToBill(decodedText, 50, 50 * 0.05),
+        errorMessage => console.warn(`Scan error: ${errorMessage}`)
+      ).catch(err => console.error("Camera start failed:", err));
+    }
+  </script></body>
 </html>
