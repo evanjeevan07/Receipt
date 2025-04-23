@@ -28,15 +28,19 @@
       border-radius: 6px;
     }
     #reader {
-      width: 300px;
+      width: 320px;
+      height: auto;
       margin: auto;
       padding: 10px;
+      border: 3px dashed #333;
+      background-color: #e2e8f0;
     }
   </style>
 </head>
 <body>
   <h2>Smart Billing System</h2>
   <div id="reader"></div>
+  <button onclick="toggleTorch()">Torch On/Off</button>
   <table id="billTable">
     <thead>
       <tr>
@@ -54,6 +58,9 @@
     const tableBody = document.getElementById("tableBody");
     const grandTotalEl = document.getElementById("grandTotal");
     let totalAmount = 0;
+    let html5QrCode;
+    let currentCameraId;
+    let torchOn = false;
 
     function addToBill(name, rate, tax) {
       const total = rate + tax;
@@ -78,8 +85,8 @@
         if (data.items && data.items.length > 0) {
           const item = data.items[0];
           const name = item.title || "Unknown Item";
-          const rate = item.offers?.[0]?.price || 50; // fallback rate
-          const tax = rate * 0.05; // assuming 5% tax
+          const rate = item.offers?.[0]?.price || 50;
+          const tax = rate * 0.05;
           addToBill(name, rate, tax);
         } else {
           alert("Unknown Product Code: " + barcode);
@@ -90,18 +97,31 @@
       }
     }
 
-    const html5QrCode = new Html5Qrcode("reader");
     Html5Qrcode.getCameras().then(devices => {
-      if (devices.length) {
-        const camId = devices[0].id;
-        html5QrCode.start(camId, {
-          fps: 10,
-          qrbox: 250
-        }, qrCodeMessage => {
-          fetchProductDetails(qrCodeMessage);
-        });
-      }
+      const backCam = devices.find(device => /back|environment/gi.test(device.label)) || devices[0];
+      currentCameraId = backCam.id;
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(currentCameraId, {
+        fps: 10,
+        qrbox: 250,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        videoConstraints: {
+          facingMode: { exact: "environment" },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      }, qrCodeMessage => {
+        fetchProductDetails(qrCodeMessage);
+      });
     });
+
+    function toggleTorch() {
+      html5QrCode.applyVideoConstraints({
+        advanced: [{ torch: torchOn = !torchOn }]
+      }).catch(err => {
+        alert("Torch not supported on this device.");
+      });
+    }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
