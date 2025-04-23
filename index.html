@@ -2,92 +2,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EVS Smart Billing System</title>
+  <title>Smart Billing System - EVS</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f0fdf4;
+      background: #f1f7f5;
       margin: 0;
-      padding: 0;
     }
     header {
-      background-color: #10b981;
+      background: #10b981;
       color: white;
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    header h1 {
-      margin: 0;
+      padding: 20px;
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
     }
     nav {
-      margin-top: 10px;
-      background: #ecfdf5;
-      padding: 1rem;
-      text-align: center;
+      background: #065f46;
+      text-align: right;
+      padding: 10px 20px;
     }
-    nav button {
-      margin: 0 10px;
-      padding: 10px 15px;
-      border: none;
-      background-color: #10b981;
+    nav a {
       color: white;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    #scanner-container {
-      text-align: center;
-      margin: 20px;
+      margin-left: 20px;
+      text-decoration: none;
+      font-weight: bold;
     }
     #reader {
-      width: 320px;
-      margin: auto;
+      width: 300px;
+      margin: 20px auto;
+      border: 3px dashed #333;
+      background-color: #e2e8f0;
       padding: 10px;
-      border: 2px dashed #555;
-      background-color: #e0f2f1;
     }
     table {
-      margin: 20px auto;
-      width: 90%;
+      margin: auto;
       border-collapse: collapse;
-      background-color: white;
+      width: 90%;
+      background: white;
     }
     th, td {
       border: 1px solid #ccc;
       padding: 10px;
       text-align: center;
     }
-    #bill-actions {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    #bill-actions button {
-      background-color: #0f766e;
+    button, select {
+      margin: 10px;
       padding: 10px 20px;
+      background: #10b981;
       border: none;
-      border-radius: 6px;
       color: white;
+      border-radius: 6px;
       font-size: 16px;
-      cursor: pointer;
+    }
+    .center {
+      text-align: center;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>EVS Smart Billing</h1>
-    <img src="https://via.placeholder.com/50" alt="Store Logo" />
-  </header>
+  <header>EVS - Smart Billing System</header>
   <nav>
-    <button onclick="alert('Coming soon: Login/Register system')">Click here to open your account</button>
-  </nav>  <div id="scanner-container">
+    <a href="#" onclick="alert('Login/Register Coming Soon')">Click here to open your account</a>
+  </nav>  <div class="center">
     <label for="cameraSelect">Select Camera:</label>
     <select id="cameraSelect"></select>
     <button onclick="toggleTorch()">Torch On/Off</button>
-    <div id="reader"></div>
-  </div>  <table id="billTable">
+  </div>  <div id="reader"></div>  <table id="billTable">
     <thead>
       <tr>
         <th>Item</th>
@@ -98,24 +82,35 @@
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
-  </table>  <h3 style="text-align:center;">Total: ₹<span id="grandTotal">0</span></h3>  <div id="bill-actions">
+  </table>  <h3 class="center">Total: ₹<span id="grandTotal">0</span></h3>
+  <div class="center">
     <button onclick="downloadPDF()">Download PDF Bill</button>
   </div>  <script>
     let html5QrCode;
     let currentCameraId = null;
     let torchOn = false;
     let totalAmount = 0;
-
     const tableBody = document.getElementById("tableBody");
     const grandTotalEl = document.getElementById("grandTotal");
     const cameraSelect = document.getElementById("cameraSelect");
 
-    const productsDB = {
-      "8901030365506": { name: "Lux Soap", rate: 40 },
-      "8901030705181": { name: "Dove Shampoo", rate: 99 },
-      "8901491503037": { name: "Clinic Plus", rate: 65 },
-      "8901399011005": { name: "Santoor Soap", rate: 35 },
-      "8901248101179": { name: "Lifebuoy Soap", rate: 32 }
+    // Sample offline product data
+    const localProductDB = {
+      "901030865169": {
+        name: "Surf Excel Detergent",
+        rate: 72,
+        tax: 3.6
+      },
+      "8901030700553": {
+        name: "Dove Shampoo",
+        rate: 120,
+        tax: 6
+      },
+      "8901393025371": {
+        name: "Lifebuoy Soap",
+        rate: 35,
+        tax: 1.75
+      }
     };
 
     function addToBill(name, rate, tax) {
@@ -125,7 +120,7 @@
       row.innerHTML = `
         <td>${name}</td>
         <td>1</td>
-        <td>₹${rate}</td>
+        <td>₹${rate.toFixed(2)}</td>
         <td>₹${tax.toFixed(2)}</td>
         <td>₹${total.toFixed(2)}</td>
       `;
@@ -134,12 +129,11 @@
     }
 
     function fetchProductDetails(barcode) {
-      if (productsDB[barcode]) {
-        const product = productsDB[barcode];
-        const tax = product.rate * 0.05;
-        addToBill(product.name, product.rate, tax);
+      const product = localProductDB[barcode];
+      if (product) {
+        addToBill(product.name, product.rate, product.tax);
       } else {
-        alert("Unknown Product Code: " + barcode);
+        alert("Unknown product: " + barcode);
       }
     }
 
@@ -155,31 +149,43 @@
     }
 
     function initScanner(cameraId) {
-      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode = new Html5Qrcode("reader", true);
       html5QrCode.start(
         { deviceId: { exact: cameraId } },
-        { fps: 10, qrbox: 250 },
+        {
+          fps: 10,
+          qrbox: 250,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        },
         decodedText => {
           fetchProductDetails(decodedText);
         },
-        error => {}
-      ).catch(err => console.error("Scanner Error", err));
+        errorMessage => {
+          console.warn("Scan error:", errorMessage);
+        }
+      ).catch(err => {
+        console.error("Camera start failed:", err);
+      });
     }
 
     function toggleTorch() {
       html5QrCode.applyVideoConstraints({
         advanced: [{ torch: torchOn = !torchOn }]
-      }).catch(() => alert("Torch not supported."));
+      }).catch(() => {
+        alert("Torch not supported on this device/browser.");
+      });
     }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.text("EVS Smart Billing", 10, 10);
+      doc.text("EVS - Smart Billing System", 10, 10);
       let y = 20;
       Array.from(tableBody.children).forEach(row => {
         const cols = row.querySelectorAll("td");
-        doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ₹${cols[2].innerText} | ₹${cols[3].innerText} | ₹${cols[4].innerText}`, 10, y);
+        doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText} | ${cols[3].innerText} | ${cols[4].innerText}`, 10, y);
         y += 10;
       });
       doc.text(`Total: ₹${totalAmount.toFixed(2)}`, 10, y + 10);
