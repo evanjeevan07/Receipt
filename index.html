@@ -35,7 +35,6 @@
       padding: 10px;
       border: 3px dashed #333;
       background-color: #e2e8f0;
-      transform: rotateY(180deg); /* mirror flip for back camera */
     }
   </style>
 </head>
@@ -114,15 +113,25 @@
     }
 
     function initScanner(cameraId) {
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start({ deviceId: { exact: cameraId } }, {
-        fps: 10,
-        qrbox: 250,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
+      html5QrCode = new Html5Qrcode("reader", /* verbose= */ true);
+      html5QrCode.start(
+        { deviceId: { exact: cameraId } },
+        {
+          fps: 10,
+          qrbox: 250,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          facingMode: "environment" // back camera
+        },
+        decodedText => {
+          fetchProductDetails(decodedText);
+        },
+        errorMessage => {
+          console.warn(`Scan error: ${errorMessage}`);
         }
-      }, decodedText => {
-        fetchProductDetails(decodedText);
+      ).catch(err => {
+        console.error("Camera start failed:", err);
       });
     }
 
