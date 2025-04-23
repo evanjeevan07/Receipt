@@ -6,7 +6,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #f1f7f5;
       text-align: center;
     }
@@ -19,13 +19,14 @@
       border: 1px solid #ccc;
       padding: 10px;
     }
-    button {
+    button, select {
       margin: 10px;
       padding: 10px 20px;
       background: #10b981;
       border: none;
       color: white;
       border-radius: 6px;
+      font-size: 16px;
     }
     #reader {
       width: 320px;
@@ -39,9 +40,12 @@
 </head>
 <body>
   <h2>Smart Billing System</h2>
-  <div id="reader"></div>
-  <button onclick="toggleTorch()">Torch On/Off</button>
-  <table id="billTable">
+  <div>
+    <label for="cameraSelect">Select Camera:</label>
+    <select id="cameraSelect"></select>
+    <button onclick="toggleTorch()">Torch On/Off</button>
+  </div>
+  <div id="reader"></div>  <table id="billTable">
     <thead>
       <tr>
         <th>Item</th>
@@ -52,20 +56,19 @@
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
-  </table>
-  <h3>Total: ₹<span id="grandTotal">0</span></h3>
+  </table>  <h3>Total: ₹<span id="grandTotal">0</span></h3>
   <button onclick="downloadPDF()">Download PDF Bill</button>  <script>
+    let html5QrCode;
+    let currentCameraId = null;
+    let torchOn = false;
+    let totalAmount = 0;
     const tableBody = document.getElementById("tableBody");
     const grandTotalEl = document.getElementById("grandTotal");
-    let totalAmount = 0;
-    let html5QrCode;
-    let currentCameraId;
-    let torchOn = false;
+    const cameraSelect = document.getElementById("cameraSelect");
 
     function addToBill(name, rate, tax) {
       const total = rate + tax;
       totalAmount += total;
-
       const row = document.createElement("tr");
       row.innerHTML = `
         <td>${name}</td>
@@ -97,29 +100,38 @@
       }
     }
 
-    Html5Qrcode.getCameras().then(devices => {
-      const backCam = devices.find(device => /back|environment/gi.test(device.label)) || devices[0];
-      currentCameraId = backCam.id;
+    function startScanner(cameraId) {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          initScanner(cameraId);
+        });
+      } else {
+        initScanner(cameraId);
+      }
+    }
+
+    function initScanner(cameraId) {
       html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(currentCameraId, {
+      html5QrCode.start(cameraId, {
         fps: 10,
         qrbox: 250,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         videoConstraints: {
-          facingMode: { exact: "environment" },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          deviceId: { exact: cameraId }
+        },
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
         }
-      }, qrCodeMessage => {
-        fetchProductDetails(qrCodeMessage);
+      }, decodedText => {
+        fetchProductDetails(decodedText);
       });
-    });
+    }
 
     function toggleTorch() {
       html5QrCode.applyVideoConstraints({
         advanced: [{ torch: torchOn = !torchOn }]
-      }).catch(err => {
-        alert("Torch not supported on this device.");
+      }).catch(() => {
+        alert("Torch not supported on this device/browser.");
       });
     }
 
@@ -136,5 +148,24 @@
       doc.text(`Total: ₹${totalAmount}`, 10, y + 10);
       doc.save("bill.pdf");
     }
+
+    Html5Qrcode.getCameras().then(devices => {
+      devices.forEach(device => {
+        const option = document.createElement("option");
+        option.value = device.id;
+        option.text = device.label || `Camera ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(option);
+      });
+      if (devices.length > 0) {
+        currentCameraId = devices[0].id;
+        cameraSelect.value = currentCameraId;
+        startScanner(currentCameraId);
+      }
+    });
+
+    cameraSelect.addEventListener("change", e => {
+      currentCameraId = e.target.value;
+      startScanner(currentCameraId);
+    });
   </script></body>
 </html>
