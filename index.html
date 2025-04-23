@@ -3,127 +3,118 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smart Billing System - EVS</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script>
-    const PRODUCTS = {
-      "901030865169": { name: "Surf Excel", price: 125 },
-      "8901030700703": { name: "Dove Shampoo", price: 99 },
-      "8901399014044": { name: "Dettol Soap", price: 45 }
-    };
-  </script>
+  <title>EVS Smart Billing System</title>
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800">
-  <header class="bg-green-600 text-white p-4 text-center text-2xl font-bold rounded-b-xl">
-    EVS Smart Billing System
-  </header>
+<body class="bg-gray-100 font-sans">
+  <header class="bg-green-600 text-white text-center p-4 text-xl font-bold">EVS Smart Billing System</header>
 
-  <div class="flex justify-between px-4 py-2">
-    <button onclick="showSection('accountSection')" class="bg-green-500 hover:bg-green-600 px-4 py-2 text-white rounded">Click here to open your account</button>
-    <button onclick="showSection('scannerSection')" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 text-white rounded">Back to Scanner</button>
-  </div>
+  <nav class="p-4 text-right">
+    <button onclick="showAccount()" class="bg-blue-500 text-white px-4 py-2 rounded">Click Here to Open Your Account</button>
+  </nav>
 
-  <!-- Account Section -->
-  <div id="accountSection" class="hidden p-4 max-w-xl mx-auto bg-white rounded-xl shadow">
-    <h2 class="text-xl font-bold mb-4">Create Customer Account</h2>
-    <form onsubmit="event.preventDefault(); saveAccount();">
-      <input id="fname" required type="text" placeholder="First Name" class="w-full mb-2 px-3 py-2 border rounded"/>
-      <input id="lname" required type="text" placeholder="Last Name" class="w-full mb-2 px-3 py-2 border rounded"/>
-      <input id="phone" required type="tel" placeholder="Phone Number" class="w-full mb-2 px-3 py-2 border rounded"/>
-      <input id="store" required type="text" placeholder="Store Name" class="w-full mb-2 px-3 py-2 border rounded"/>
-      <button class="bg-green-500 hover:bg-green-600 px-4 py-2 text-white rounded">Create Account</button>
-    </form>
-  </div>
-
-  <!-- Scanner Section -->
-  <div id="scannerSection" class="p-4">
-    <div id="reader" class="mx-auto border-dashed border-2 border-gray-400 w-80 h-60 flex justify-center items-center text-gray-500">
-      Scanner Loading...
+  <section id="accountSection" class="p-4 hidden">
+    <div class="bg-white shadow p-4 max-w-lg mx-auto rounded">
+      <h2 class="text-lg font-semibold mb-2">Create Account</h2>
+      <input type="text" id="firstName" placeholder="First Name" class="border p-2 mb-2 w-full" />
+      <input type="text" id="lastName" placeholder="Last Name" class="border p-2 mb-2 w-full" />
+      <input type="text" id="phoneNumber" placeholder="Phone Number" class="border p-2 mb-2 w-full" />
+      <input type="text" id="storeName" placeholder="Store Name" class="border p-2 mb-2 w-full" />
+      <button onclick="saveAccount()" class="bg-green-600 text-white px-4 py-2 rounded">Save Account</button>
     </div>
+  </section>
 
-    <div class="text-center mt-4">
-      <input id="barcodeInput" type="text" placeholder="Enter barcode manually" class="border px-3 py-2 rounded"/>
-      <button onclick="manualScan()" class="bg-indigo-500 text-white px-4 py-2 rounded ml-2">Scan</button>
+  <section id="scannerSection" class="p-4 hidden">
+    <div class="bg-white shadow p-4 max-w-md mx-auto rounded">
+      <div id="reader" class="mx-auto border-2 border-dashed border-gray-400 p-2 w-80 h-80"></div>
     </div>
+  </section>
 
-    <table class="table-auto w-full mt-6 bg-white shadow rounded">
-      <thead class="bg-gray-200">
-        <tr>
-          <th class="p-2">Item</th>
-          <th class="p-2">Qty</th>
-          <th class="p-2">Rate</th>
-          <th class="p-2">Tax</th>
-          <th class="p-2">Total</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-
-    <div class="text-right mt-4 mr-6">
-      <strong>Total: ₹<span id="grandTotal">0</span></strong>
+  <section id="billSection" class="p-4 hidden">
+    <div class="max-w-3xl mx-auto bg-white shadow rounded p-4">
+      <h3 class="text-xl font-bold mb-4">Bill Summary</h3>
+      <table class="w-full text-left border">
+        <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Tax</th><th>Total</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="text-right mt-4 text-lg">Grand Total: ₹<span id="grandTotal">0</span></div>
+      <button onclick="downloadPDF()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">Download PDF</button>
     </div>
-
-    <div class="text-center mt-4">
-      <button onclick="downloadPDF()" class="bg-purple-600 text-white px-4 py-2 rounded">Download Bill as PDF</button>
-    </div>
-  </div>
+  </section>
 
   <script>
-    let total = 0;
+    const readerElem = document.getElementById("reader");
+    const scannerSection = document.getElementById("scannerSection");
+    const billSection = document.getElementById("billSection");
     const tableBody = document.getElementById("tableBody");
-    const grandTotal = document.getElementById("grandTotal");
+    const grandTotalEl = document.getElementById("grandTotal");
+    const products = {
+      "901030865169": { name: "Surf Excel", price: 55 },
+      "123456789012": { name: "Dove Shampoo", price: 75 },
+    };
 
-    function addToBill(name, rate) {
-      const tax = rate * 0.05;
-      const totalRow = rate + tax;
-      total += totalRow;
-      const row = document.createElement("tr");
-      row.innerHTML = `<td class="p-2">${name}</td><td class="p-2">1</td><td class="p-2">₹${rate}</td><td class="p-2">₹${tax.toFixed(2)}</td><td class="p-2">₹${totalRow.toFixed(2)}</td>`;
-      tableBody.appendChild(row);
-      grandTotal.innerText = total.toFixed(2);
-    }
+    let totalAmount = 0;
 
-    function manualScan() {
-      const code = document.getElementById("barcodeInput").value.trim();
-      const product = PRODUCTS[code];
-      if (product) {
-        addToBill(product.name, product.price);
-      } else {
-        alert("Unknown Product Code");
-      }
+    function showAccount() {
+      document.getElementById("accountSection").classList.remove("hidden");
     }
 
     function saveAccount() {
-      const name = `${fname.value} ${lname.value}`;
-      const phone = phone.value;
-      const store = store.value;
-      alert(`Account Created!\nName: ${name}\nPhone: ${phone}\nStore: ${store}`);
-      showSection('scannerSection');
+      document.getElementById("accountSection").classList.add("hidden");
+      scannerSection.classList.remove("hidden");
+      billSection.classList.remove("hidden");
+      startScanner();
+    }
+
+    function addToBill(name, price) {
+      const tax = price * 0.05;
+      const total = price + tax;
+      totalAmount += total;
+
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${name}</td><td>1</td><td>₹${price}</td><td>₹${tax.toFixed(2)}</td><td>₹${total.toFixed(2)}</td>`;
+      tableBody.appendChild(row);
+      grandTotalEl.innerText = totalAmount.toFixed(2);
+    }
+
+    function fetchProductDetails(barcode) {
+      const product = products[barcode];
+      if (product) {
+        addToBill(product.name, product.price);
+      } else {
+        alert("Unknown product: " + barcode);
+      }
+    }
+
+    function startScanner() {
+      const qr = new Html5Qrcode("reader");
+      qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (text) => {
+          qr.stop();
+          fetchProductDetails(text);
+          setTimeout(() => startScanner(), 1000);
+        },
+        (error) => console.warn(error)
+      );
     }
 
     function downloadPDF() {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
-      doc.text("EVS Smart Billing", 10, 10);
+      doc.text("EVS Billing Summary", 10, 10);
       let y = 20;
-      document.querySelectorAll("#tableBody tr").forEach(row => {
+      Array.from(tableBody.children).forEach(row => {
         const cols = row.querySelectorAll("td");
-        doc.text(`${cols[0].innerText} | Qty: ${cols[1].innerText} | ₹${cols[2].innerText} | ₹${cols[3].innerText} | ₹${cols[4].innerText}`, 10, y);
+        doc.text(`${cols[0].innerText} | ${cols[1].innerText} | ${cols[2].innerText} | ${cols[3].innerText} | ${cols[4].innerText}`, 10, y);
         y += 10;
       });
-      doc.text(`Grand Total: ₹${total.toFixed(2)}`, 10, y + 10);
+      doc.text(`Grand Total: ₹${grandTotalEl.innerText}`, 10, y + 10);
       doc.save("bill.pdf");
     }
-
-    function showSection(id) {
-      document.getElementById("accountSection").classList.add("hidden");
-      document.getElementById("scannerSection").classList.add("hidden");
-      document.getElementById(id).classList.remove("hidden");
-    }
-
-    showSection("scannerSection");
   </script>
 </body>
 </html>
