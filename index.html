@@ -1,185 +1,73 @@
-<!DOCTYPE html><html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EVS Smart Billing System</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0fdf4;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #10b981;
-      color: white;
-      padding: 15px;
-      text-align: center;
-      font-size: 24px;
-    }
-    nav {
-      background: #064e3b;
-      padding: 10px;
-      text-align: center;
-    }
-    nav button {
-      background: #34d399;
-      color: white;
-      padding: 10px 20px;
-      margin: 5px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #accountSection, #scannerSection {
-      display: none;
-      padding: 20px;
-      text-align: center;
-    }
-    table {
-      margin: auto;
-      border-collapse: collapse;
-      width: 90%;
-      margin-top: 20px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
-    }
-    #reader {
-      width: 320px;
-      margin: 20px auto;
-      padding: 10px;
-      border: 3px dashed #333;
-      background-color: #e2e8f0;
-    }
-    input {
-      padding: 10px;
-      margin: 10px;
-      width: 250px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    .form-group {
-      margin: 10px auto;
-    }
-    #submitAccount {
-      background: #10b981;
-      color: white;
-      font-size: 16px;
-    }
-  </style>
-</head>
-<body>
-  <header>EVS Smart Billing System</header>
-  <nav>
-    <button onclick="showAccountForm()">Click here to open your account</button>
-    <button onclick="showScanner()">Scan & Bill</button>
-  </nav>  <section id="accountSection">
-    <h2>Create Account</h2>
-    <div class="form-group"><input type="text" id="firstName" placeholder="First Name"></div>
-    <div class="form-group"><input type="text" id="lastName" placeholder="Last Name"></div>
-    <div class="form-group"><input type="text" id="storeName" placeholder="Store Name"></div>
-    <div class="form-group"><input type="text" id="phoneNumber" placeholder="Phone Number"></div>
-    <button id="submitAccount" onclick="createAccount()">Submit</button>
-  </section>  <section id="scannerSection">
-    <h2>Welcome, <span id="userName">Customer</span></h2>
-    <div id="reader"></div>
-    <table id="billTable">
-      <thead>
-        <tr><th>Item</th><th>Qty</th><th>Rate</th><th>Tax</th><th>Total</th></tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-    <h3>Total: ₹<span id="grandTotal">0</span></h3>
-    <button onclick="downloadPDF()">Download PDF Bill</button>
-  </section>  <script>
-    let html5QrCode;
-    let totalAmount = 0;
-    const tableBody = document.getElementById("tableBody");
-    const grandTotalEl = document.getElementById("grandTotal");
+// Smart Billing App - Single Page (React + HTML + CSS + Magic UI)
 
-    function showAccountForm() {
-      document.getElementById("accountSection").style.display = "block";
-      document.getElementById("scannerSection").style.display = "none";
-    }
+import React, { useState, useEffect } from 'react'; import { Html5QrcodeScanner } from 'html5-qrcode'; import { Button } from '@/components/ui/button'; import { Card, CardContent } from '@/components/ui/card'; import './App.css';
 
-    function showScanner() {
-      document.getElementById("scannerSection").style.display = "block";
-      document.getElementById("accountSection").style.display = "none";
-      startScanner();
-    }
+const App = () => { const [cameraId, setCameraId] = useState(null); const [scanner, setScanner] = useState(null); const [products, setProducts] = useState([]); const [total, setTotal] = useState(0); const [showAccount, setShowAccount] = useState(false); const [customer, setCustomer] = useState({ first: '', last: '', phone: '', store: '' });
 
-    function createAccount() {
-      const firstName = document.getElementById("firstName").value;
-      const lastName = document.getElementById("lastName").value;
-      const phone = document.getElementById("phoneNumber").value;
-      const store = document.getElementById("storeName").value;
+useEffect(() => { Html5QrcodeScanner.getCameras().then(devices => { if (devices.length) { setCameraId(devices[0].id); } }); }, []);
 
-      if (!firstName || !lastName || !phone || !store) {
-        alert("Please fill all fields");
-        return;
-      }
-      alert("OTP sent to " + phone);
-      document.getElementById("userName").innerText = firstName + ' ' + lastName;
-      showScanner();
-    }
+const startScanner = () => { if (cameraId) { const html5QrCode = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }); html5QrCode.render( result => handleScan(result), error => console.warn(error) ); setScanner(html5QrCode); } };
 
-    function addToBill(name, rate, tax) {
-      const total = rate + tax;
-      totalAmount += total;
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${name}</td><td>1</td><td>₹${rate}</td><td>₹${tax}</td><td>₹${total}</td>`;
-      tableBody.appendChild(row);
-      grandTotalEl.innerText = totalAmount;
-    }
+const handleScan = (code) => { const knownProducts = { '901030865169': { name: 'Surf Excel', price: 120 }, '123456789012': { name: 'Lux Soap', price: 35 }, };
 
-    function fetchProductDetails(barcode) {
-      const localDB = {
-        "901030865169": { name: "Surf Excel", rate: 52 },
-        "8901030701068": { name: "Clinic Plus Shampoo", rate: 45 }
-      };
+if (knownProducts[code]) {
+  const item = knownProducts[code];
+  const tax = item.price * 0.05;
+  const totalItem = item.price + tax;
+  setProducts([...products, { ...item, tax, total: totalItem }]);
+  setTotal(prev => prev + totalItem);
+} else {
+  alert('Unknown Product Scanned');
+}
 
-      if (localDB[barcode]) {
-        const item = localDB[barcode];
-        const tax = item.rate * 0.05;
-        addToBill(item.name, item.rate, tax);
-      } else {
-        alert("Unknown Product: " + barcode);
-      }
-    }
+};
 
-    function startScanner() {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => html5QrCode.clear()).catch(console.error);
-      }
-      html5QrCode = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(devices => {
-        const cameraId = devices[0].id;
-        html5QrCode.start(
-          { deviceId: { exact: cameraId } },
-          { fps: 10, qrbox: 250 },
-          decodedText => fetchProductDetails(decodedText),
-          error => console.warn(error)
-        ).catch(console.error);
-      }).catch(err => alert("Camera not found: " + err));
-    }
+const handleAccountSubmit = (e) => { e.preventDefault(); setShowAccount(false); alert('Account created successfully!'); };
 
-    function downloadPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text("Smart Billing System", 10, 10);
-      let y = 20;
-      Array.from(tableBody.children).forEach(row => {
-        const cols = row.querySelectorAll("td");
-        doc.text(`${cols[0].innerText} | Qty: ${cols[1].innerText} | Rate: ${cols[2].innerText} | Tax: ${cols[3].innerText} | Total: ${cols[4].innerText}`, 10, y);
-        y += 10;
-      });
-      doc.text(`Total: ₹${totalAmount}`, 10, y + 10);
-      doc.save("bill.pdf");
-    }
-  </script></body>
-</html>
+return ( <div className="app"> <header className="header"> <h1>EVS Smart Billing</h1> <Button onClick={() => setShowAccount(true)}>Click here to open your account</Button> </header>
+
+{showAccount && (
+    <Card className="account-form">
+      <CardContent>
+        <form onSubmit={handleAccountSubmit}>
+          <input type="text" placeholder="First Name" required onChange={e => setCustomer({ ...customer, first: e.target.value })} />
+          <input type="text" placeholder="Last Name" required onChange={e => setCustomer({ ...customer, last: e.target.value })} />
+          <input type="text" placeholder="Phone Number" required onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
+          <input type="text" placeholder="Store Name" required onChange={e => setCustomer({ ...customer, store: e.target.value })} />
+          <Button type="submit">Create Account</Button>
+        </form>
+      </CardContent>
+    </Card>
+  )}
+
+  <div id="reader" className="scanner-box"></div>
+  <Button onClick={startScanner}>Start Scanner</Button>
+
+  <table className="bill-table">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Rate</th>
+        <th>Tax</th>
+        <th>Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {products.map((prod, index) => (
+        <tr key={index}>
+          <td>{prod.name}</td>
+          <td>₹{prod.price}</td>
+          <td>₹{prod.tax.toFixed(2)}</td>
+          <td>₹{prod.total.toFixed(2)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <h3>Total Amount: ₹{total.toFixed(2)}</h3>
+</div>
+
+); };
+
+export default App;
+
