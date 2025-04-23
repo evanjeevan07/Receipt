@@ -1,73 +1,129 @@
-// Smart Billing App - Single Page (React + HTML + CSS + Magic UI)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Billing System - EVS</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    const PRODUCTS = {
+      "901030865169": { name: "Surf Excel", price: 125 },
+      "8901030700703": { name: "Dove Shampoo", price: 99 },
+      "8901399014044": { name: "Dettol Soap", price: 45 }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+  <header class="bg-green-600 text-white p-4 text-center text-2xl font-bold rounded-b-xl">
+    EVS Smart Billing System
+  </header>
 
-import React, { useState, useEffect } from 'react'; import { Html5QrcodeScanner } from 'html5-qrcode'; import { Button } from '@/components/ui/button'; import { Card, CardContent } from '@/components/ui/card'; import './App.css';
+  <div class="flex justify-between px-4 py-2">
+    <button onclick="showSection('accountSection')" class="bg-green-500 hover:bg-green-600 px-4 py-2 text-white rounded">Click here to open your account</button>
+    <button onclick="showSection('scannerSection')" class="bg-blue-500 hover:bg-blue-600 px-4 py-2 text-white rounded">Back to Scanner</button>
+  </div>
 
-const App = () => { const [cameraId, setCameraId] = useState(null); const [scanner, setScanner] = useState(null); const [products, setProducts] = useState([]); const [total, setTotal] = useState(0); const [showAccount, setShowAccount] = useState(false); const [customer, setCustomer] = useState({ first: '', last: '', phone: '', store: '' });
+  <!-- Account Section -->
+  <div id="accountSection" class="hidden p-4 max-w-xl mx-auto bg-white rounded-xl shadow">
+    <h2 class="text-xl font-bold mb-4">Create Customer Account</h2>
+    <form onsubmit="event.preventDefault(); saveAccount();">
+      <input id="fname" required type="text" placeholder="First Name" class="w-full mb-2 px-3 py-2 border rounded"/>
+      <input id="lname" required type="text" placeholder="Last Name" class="w-full mb-2 px-3 py-2 border rounded"/>
+      <input id="phone" required type="tel" placeholder="Phone Number" class="w-full mb-2 px-3 py-2 border rounded"/>
+      <input id="store" required type="text" placeholder="Store Name" class="w-full mb-2 px-3 py-2 border rounded"/>
+      <button class="bg-green-500 hover:bg-green-600 px-4 py-2 text-white rounded">Create Account</button>
+    </form>
+  </div>
 
-useEffect(() => { Html5QrcodeScanner.getCameras().then(devices => { if (devices.length) { setCameraId(devices[0].id); } }); }, []);
+  <!-- Scanner Section -->
+  <div id="scannerSection" class="p-4">
+    <div id="reader" class="mx-auto border-dashed border-2 border-gray-400 w-80 h-60 flex justify-center items-center text-gray-500">
+      Scanner Loading...
+    </div>
 
-const startScanner = () => { if (cameraId) { const html5QrCode = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }); html5QrCode.render( result => handleScan(result), error => console.warn(error) ); setScanner(html5QrCode); } };
+    <div class="text-center mt-4">
+      <input id="barcodeInput" type="text" placeholder="Enter barcode manually" class="border px-3 py-2 rounded"/>
+      <button onclick="manualScan()" class="bg-indigo-500 text-white px-4 py-2 rounded ml-2">Scan</button>
+    </div>
 
-const handleScan = (code) => { const knownProducts = { '901030865169': { name: 'Surf Excel', price: 120 }, '123456789012': { name: 'Lux Soap', price: 35 }, };
-
-if (knownProducts[code]) {
-  const item = knownProducts[code];
-  const tax = item.price * 0.05;
-  const totalItem = item.price + tax;
-  setProducts([...products, { ...item, tax, total: totalItem }]);
-  setTotal(prev => prev + totalItem);
-} else {
-  alert('Unknown Product Scanned');
-}
-
-};
-
-const handleAccountSubmit = (e) => { e.preventDefault(); setShowAccount(false); alert('Account created successfully!'); };
-
-return ( <div className="app"> <header className="header"> <h1>EVS Smart Billing</h1> <Button onClick={() => setShowAccount(true)}>Click here to open your account</Button> </header>
-
-{showAccount && (
-    <Card className="account-form">
-      <CardContent>
-        <form onSubmit={handleAccountSubmit}>
-          <input type="text" placeholder="First Name" required onChange={e => setCustomer({ ...customer, first: e.target.value })} />
-          <input type="text" placeholder="Last Name" required onChange={e => setCustomer({ ...customer, last: e.target.value })} />
-          <input type="text" placeholder="Phone Number" required onChange={e => setCustomer({ ...customer, phone: e.target.value })} />
-          <input type="text" placeholder="Store Name" required onChange={e => setCustomer({ ...customer, store: e.target.value })} />
-          <Button type="submit">Create Account</Button>
-        </form>
-      </CardContent>
-    </Card>
-  )}
-
-  <div id="reader" className="scanner-box"></div>
-  <Button onClick={startScanner}>Start Scanner</Button>
-
-  <table className="bill-table">
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>Rate</th>
-        <th>Tax</th>
-        <th>Total</th>
-      </tr>
-    </thead>
-    <tbody>
-      {products.map((prod, index) => (
-        <tr key={index}>
-          <td>{prod.name}</td>
-          <td>₹{prod.price}</td>
-          <td>₹{prod.tax.toFixed(2)}</td>
-          <td>₹{prod.total.toFixed(2)}</td>
+    <table class="table-auto w-full mt-6 bg-white shadow rounded">
+      <thead class="bg-gray-200">
+        <tr>
+          <th class="p-2">Item</th>
+          <th class="p-2">Qty</th>
+          <th class="p-2">Rate</th>
+          <th class="p-2">Tax</th>
+          <th class="p-2">Total</th>
         </tr>
-      ))}
-    </tbody>
-  </table>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
 
-  <h3>Total Amount: ₹{total.toFixed(2)}</h3>
-</div>
+    <div class="text-right mt-4 mr-6">
+      <strong>Total: ₹<span id="grandTotal">0</span></strong>
+    </div>
 
-); };
+    <div class="text-center mt-4">
+      <button onclick="downloadPDF()" class="bg-purple-600 text-white px-4 py-2 rounded">Download Bill as PDF</button>
+    </div>
+  </div>
 
-export default App;
+  <script>
+    let total = 0;
+    const tableBody = document.getElementById("tableBody");
+    const grandTotal = document.getElementById("grandTotal");
 
+    function addToBill(name, rate) {
+      const tax = rate * 0.05;
+      const totalRow = rate + tax;
+      total += totalRow;
+      const row = document.createElement("tr");
+      row.innerHTML = `<td class="p-2">${name}</td><td class="p-2">1</td><td class="p-2">₹${rate}</td><td class="p-2">₹${tax.toFixed(2)}</td><td class="p-2">₹${totalRow.toFixed(2)}</td>`;
+      tableBody.appendChild(row);
+      grandTotal.innerText = total.toFixed(2);
+    }
+
+    function manualScan() {
+      const code = document.getElementById("barcodeInput").value.trim();
+      const product = PRODUCTS[code];
+      if (product) {
+        addToBill(product.name, product.price);
+      } else {
+        alert("Unknown Product Code");
+      }
+    }
+
+    function saveAccount() {
+      const name = `${fname.value} ${lname.value}`;
+      const phone = phone.value;
+      const store = store.value;
+      alert(`Account Created!\nName: ${name}\nPhone: ${phone}\nStore: ${store}`);
+      showSection('scannerSection');
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("EVS Smart Billing", 10, 10);
+      let y = 20;
+      document.querySelectorAll("#tableBody tr").forEach(row => {
+        const cols = row.querySelectorAll("td");
+        doc.text(`${cols[0].innerText} | Qty: ${cols[1].innerText} | ₹${cols[2].innerText} | ₹${cols[3].innerText} | ₹${cols[4].innerText}`, 10, y);
+        y += 10;
+      });
+      doc.text(`Grand Total: ₹${total.toFixed(2)}`, 10, y + 10);
+      doc.save("bill.pdf");
+    }
+
+    function showSection(id) {
+      document.getElementById("accountSection").classList.add("hidden");
+      document.getElementById("scannerSection").classList.add("hidden");
+      document.getElementById(id).classList.remove("hidden");
+    }
+
+    showSection("scannerSection");
+  </script>
+</body>
+</html>
